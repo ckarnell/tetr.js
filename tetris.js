@@ -193,6 +193,7 @@ var settings = {
   Ghost: 0,
   Grid: 0,
   Outline: 0,
+  'New Controls': 1,
 };
 
 var setting = {
@@ -220,6 +221,7 @@ var setting = {
   Ghost: ['Normal', 'Colored', 'Off'],
   Grid: ['Off', 'On'],
   Outline: ['Off', 'On'],
+  'New Controls': ['Off', 'On'],
 };
 
 var frame;
@@ -269,12 +271,16 @@ var binds = {
   moveRight: 39,
   moveDown: 40,
   hardDrop: 32,
-  holdPiece: 67,
+  holdPiece: 77,
   rotRight: 88,
   rotLeft: 90,
   rot180: 16,
+  leftDAS: 81,
+  rightDAS: 82,
+  contextShift: 32,
   retry: 82,
 };
+
 var flags = {
   hardDrop: 1,
   moveRight: 2,
@@ -284,6 +290,9 @@ var flags = {
   rotRight: 32,
   rotLeft: 64,
   rot180: 128,
+  leftDAS: 512,
+  rightDAS: 1024,
+  contextShift: 2048,
 };
 
 function resize() {
@@ -751,11 +760,18 @@ addEventListener(
         keysDown |= flags.rot180;
       } else if (e.keyCode === binds.holdPiece) {
         keysDown |= flags.holdPiece;
+      } else if (e.keyCode === binds.leftDAS) {
+        keysDown |= flags.leftDAS;
+      } else if (e.keyCode === binds.rightDAS) {
+        keysDown |= flags.rightDAS;
+      } else if (e.keyCode === binds.contextShift) {
+        keysDown |= flags.contextShift;
       }
     }
   },
   false,
 );
+
 addEventListener(
   'keyup',
   function(e) {
@@ -776,6 +792,12 @@ addEventListener(
         keysDown ^= flags.rot180;
       } else if (e.keyCode === binds.holdPiece && keysDown & flags.holdPiece) {
         keysDown ^= flags.holdPiece;
+      } else if (e.keyCode === binds.leftDAS && keysDown & flags.leftDAS) {
+        keysDown ^= flags.leftDAS;
+      } else if (e.keyCode === binds.rightDAS && keysDown & flags.rightDAS) {
+        keysDown ^= flags.rightDAS;
+      } else if (e.keyCode === binds.contextShift && keysDown & flags.contextShift) {
+        keysDown ^= flags.contextShift;
       }
     }
   },
@@ -800,27 +822,12 @@ function update() {
     piece.hold();
   }
 
-  if (flags.rotLeft & keysDown && !(lastKeys & flags.rotLeft)) {
-    piece.rotate(-1);
-    piece.finesse++;
-  } else if (flags.rotRight & keysDown && !(lastKeys & flags.rotRight)) {
-    piece.rotate(1);
-    piece.finesse++;
-  } else if (flags.rot180 & keysDown && !(lastKeys & flags.rot180)) {
-    piece.rotate(1);
-    piece.rotate(1);
-    piece.finesse++;
+  if (settings['New Controls']) {
+    piece.updatePositionNewControls();
+  } else {
+    piece.updatePositionStandardControls();
   }
 
-  piece.checkShift();
-
-  if (flags.moveDown & keysDown) {
-    piece.shiftDown();
-    //piece.finesse++;
-  }
-  if (!(lastKeys & flags.hardDrop) && flags.hardDrop & keysDown) {
-    piece.hardDrop();
-  }
 
   piece.update();
 

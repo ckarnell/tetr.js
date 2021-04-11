@@ -13,7 +13,12 @@ function Piece() {
   this.held = false;
   this.finesse = 0;
   this.dirty = false;
+  this.DASDir = 0;
+  this.lastDASDir = 0;
+  this.lastShiftDir = 0;
+  this.contextShifted = false;
 }
+
 /**
  * Removes last active piece, and gets the next active piece from the grab bag.
  */
@@ -32,6 +37,7 @@ Piece.prototype.new = function(index) {
   this.tetro = pieces[index].tetro;
   this.kickData = pieces[index].kickData;
   this.x = pieces[index].x;
+  this.originalX = pieces[index].x;
   this.y = pieces[index].y;
   this.index = index;
 
@@ -49,6 +55,7 @@ Piece.prototype.new = function(index) {
     menu(3);
   }
 };
+
 Piece.prototype.rotate = function(direction) {
   // Rotates tetromino.
   var rotated = [];
@@ -90,6 +97,7 @@ Piece.prototype.rotate = function(direction) {
     }
   }
 };
+
 Piece.prototype.checkShift = function() {
   // Shift key pressed event.
   if (keysDown & flags.moveLeft && !(lastKeys & flags.moveLeft)) {
@@ -147,6 +155,7 @@ Piece.prototype.checkShift = function() {
     this.shiftReleased = true;
     this.shiftDir = 0;
   }
+
   // Handle events
   if (this.shiftDir) {
     // 1. When key pressed instantly move over once.
@@ -171,6 +180,133 @@ Piece.prototype.checkShift = function() {
     }
   }
 };
+
+Piece.prototype.checkRotate = function() {
+  var rotatedThisUpdate = false;
+  if (flags.rotLeft & keysDown && !(lastKeys & flags.rotLeft)) {
+    this.rotate(-1);
+    rotatedThisUpdate = true;
+    this.finesse++;
+  } else if (flags.rotRight & keysDown && !(lastKeys & flags.rotRight)) {
+    this.rotate(1);
+    rotatedThisUpdate = true;
+    this.finesse++;
+  } else if (flags.rot180 & keysDown && !(lastKeys & flags.rot180)) {
+    this.rotate(1);
+    this.rotate(1);
+    rotatedThisUpdate = true;
+    this.finesse++;
+  }
+  return rotatedThisUpdate
+}
+
+Piece.prototype.updatePositionStandardControls = function() {
+  this.checkRotate();
+  this.checkShift();
+
+  if (flags.moveDown & keysDown) {
+    this.shiftDown();
+    //piece.finesse++;
+  }
+
+  if (!(lastKeys & flags.hardDrop) && flags.hardDrop & keysDown) {
+    piece.hardDrop();
+  }
+}
+
+Piece.prototype.updatePositionNewControls = function() {
+  // Calculate inputs and get default X value
+  var calculatedX = this.originalX;
+  var contextShifted = keysDown & flags.contextShift;
+  var DASDir = 0;
+  var shiftDir = 0;
+
+  // DAS key pressed event
+  if (keysDown & flags.leftDAS && lastKeys & flags.leftDAS && keysDown & flags.rightDAS && lastKeys & flags.rightDAS) {
+    // If they've been holding both DAS keys, default to whatever it was
+    DASDir = this.lastDASDir;
+  } else if (keysDown & flags.leftDAS) {
+    DASDir = -1;
+    if (this.lastDASDir === -1 && (!(lastKeys & flags.rightDAS) && flags.rightDAS & keysDown)) {
+      DASDir = 1;
+    }
+  } else if (keysDown & flags.rightDAS) {
+    DASDir = 1;
+
+    if (this.lastDASDir === 1 && (!(lastKeys & flags.leftDAS) && flags.leftDAS & keysDown)) {
+      DASDir = -1;
+    }
+  }
+
+  this.lastDASDir = DASDir;
+
+  // Shift key pressed event
+  if (keysDown & flags.moveLeft && lastKeys & flags.moveLeft && keysDown & flags.moveRight && lastKeys & flags.moveRight) {
+    // If they've been holding both DAS keys, default to whatever it was
+    shiftDir = this.lastShiftDir;
+  } else if (keysDown & flags.moveLeft) {
+    shiftDir = -1;
+    if (this.lastShiftDir === -1 && (!(lastKeys & flags.moveRight) && keysDown & flags.moveRight)) {
+      shiftDir = 1;
+    }
+  } else if (keysDown & flags.moveRight) {
+    shiftDir = 1;
+    if (this.lastShiftDir === 1 && (!(lastKeys & flags.moveLeft) && keysDown & flags.moveLeft)) {
+      shiftDir = -1;
+    }
+  }
+  this.lastShiftDir = shiftDir;
+
+  // Calculate X based on inputs
+  if (DASDir) {
+    if (DASDir < 0) {
+      calculatedX += this.getShift(-10, this.originalX);
+      if (shiftDir) {
+        calculatedX += 1;
+      }
+    } else {
+      calculatedX += this.getShift(10, this.originalX);
+      if (shiftDir) {
+        calculatedX -= 1;
+      }
+    }
+    // Call this.DASLeft or this.DASRight,
+    // then check for flags.moveLeft and flags.moveRight and move accordingly
+  } else if (shiftDir) {
+    // this.shift(shiftDir);
+    calculatedX += shiftDir;
+
+    if (contextShifted) {
+      calculatedX += shiftDir;
+    }
+  }
+
+  // // Move the piece along the X axis, if the calculated value is different
+  const deltaX = calculatedX - this.x
+  if (deltaX !== 0) {
+    this.shift(deltaX);
+  }
+
+  var rotatedThisUpdate = this.checkRotate();
+
+  if (rotatedThisUpdate) {
+    if (!(keysDown & flags.contextShift) && !(keysDown & flags.moveLeft) && !(keysDown & flags.moveRight)) {
+      if (keysDown & flags.leftDAS) {
+        while (this.moveValid(-1, 0, this.tetro)) {
+          this.x--;
+        }
+      } else if (keysDown & flags.rightDAS) {
+        while (this.moveValid(1, 0, this.tetro)) {
+          this.x++;
+        }
+      }
+    }
+    this.hardDrop();
+  } else if (!(lastKeys & flags.hardDrop) && flags.hardDrop & keysDown) {
+    this.hardDrop();
+  }
+};
+
 Piece.prototype.shift = function(direction) {
   this.arrDelay = 0;
   if (settings.ARR === 0 && this.shiftDelay === settings.DAS) {
@@ -184,6 +320,7 @@ Piece.prototype.shift = function(direction) {
     this.x += direction;
   }
 };
+
 Piece.prototype.shiftDown = function() {
   if (this.moveValid(0, 1, this.tetro)) {
     var grav = gravityArr[settings['Soft Drop'] + 1];
@@ -191,16 +328,37 @@ Piece.prototype.shiftDown = function() {
     else this.y += grav;
   }
 };
+
 Piece.prototype.hardDrop = function() {
   this.y += this.getDrop(20);
   this.lockDelay = settings['Lock Delay'];
 };
+
 Piece.prototype.getDrop = function(distance) {
   for (var i = 1; i <= distance; i++) {
     if (!this.moveValid(0, i, this.tetro)) return i - 1;
   }
   return i - 1;
 };
+
+Piece.prototype.getShift = function(distance, x=undefined) {
+  if (x === undefined) {
+    x = this.x;
+  }
+
+  if (distance < 0) {
+    for (var i = 0; i > distance; i--) {
+      if (!this.moveValid(i, 0, this.tetro, x)) return i + 1;
+    }
+    return i + 1; 
+  }
+
+  for (var i = 0; i < distance; i++) {
+    if (!this.moveValid(i, 0, this.tetro, x)) return i - 1;
+  }
+  return i - 1; 
+};
+
 Piece.prototype.hold = function() {
   var temp = hold.piece;
   if (!this.held) {
@@ -215,13 +373,17 @@ Piece.prototype.hold = function() {
     hold.draw();
   }
 };
+
 /**
  * Checks if position and orientation passed is valid.
  *  We call it for every action instead of only once a frame in case one
  *  of the actions is still valid, we don't want to block it.
  */
-Piece.prototype.moveValid = function(cx, cy, tetro) {
-  cx = cx + this.x;
+Piece.prototype.moveValid = function(cx, cy, tetro, customX=undefined) {
+  if (customX === undefined) {
+    customX = this.x;
+  }
+  cx = cx + customX;
   cy = Math.floor(cy + this.y);
 
   for (var x = 0; x < tetro.length; x++) {
@@ -240,6 +402,7 @@ Piece.prototype.moveValid = function(cx, cy, tetro) {
   this.lockDelay = 0;
   return true;
 };
+
 Piece.prototype.update = function() {
   if (this.moveValid(0, 1, this.tetro)) {
     landed = false;
@@ -266,9 +429,11 @@ Piece.prototype.update = function() {
     }
   }
 };
+
 Piece.prototype.draw = function() {
   draw(this.tetro, this.x, this.y, activeCtx);
 };
+
 Piece.prototype.drawGhost = function() {
   if (!settings.Ghost && !landed) {
     draw(this.tetro, this.x, this.y + this.getDrop(22), activeCtx, 0);

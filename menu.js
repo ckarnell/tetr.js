@@ -1,4 +1,4 @@
-var version = '0.1.8';
+var version = '0.1.9'; // Change this to bust cache
 var setLoop;
 var arrowReleased = true;
 var arrowDelay = 0;
@@ -102,17 +102,6 @@ var key = {
 };
 
 /**
- * Show and hide menus.
- */
-var menus = document.getElementsByClassName('menu');
-function menu(menuIndex) {
-  for (var i = 0, len = menus.length; i < len; i++) {
-    menus[i].classList.remove('on');
-  }
-  if (menuIndex !== void 0) menus[menuIndex].classList.add('on');
-}
-
-/**
  * Controls Menu
  */
 var newKey,
@@ -120,21 +109,97 @@ var newKey,
   tempKey,
   controls = document.getElementById('controls'),
   controlCells = controls.getElementsByTagName('td');
+
 // Give controls an event listener.
-for (var i = 0, len = controlCells.length; i < len; i++) {
-  controlCells[i].onclick = function() {
-    // First check if we're already waiting for an input.
-    if (currCell) {
-      // TODO DRY
-      // Make this into a function and call it when we press Esc.
-      binds[currCell.id] = tempKey;
-      currCell.innerHTML = key[tempKey];
-    }
-    tempKey = binds[this.id];
-    this.innerHTML = 'Press key';
-    currCell = this;
-  };
+var defaultControlsOptions = {
+  'Move Left:    ': {'id': 'moveLeft', 'symbol': '←'},
+  'Move Right:   ': {'id': 'moveRight', 'symbol': '→'},
+  'Move Down:    ': {'id': 'moveDown', 'symbol': '↓'},
+  'Hard Drop:    ': {'id': 'hardDrop', 'symbol': 'Space'},
+  'Hold:         ': {'id': 'holdPiece', 'symbol': 'C'},
+  'Rotate Right: ': {'id': 'rotRight', 'symbol': 'X'},
+  'Rotate Left:  ': {'id': 'rotLeft', 'symbol': 'Z'},
+  'Rotate 180:   ': {'id': 'rot180', 'symbol': 'Shift'},
+  'Retry:        ': {'id': 'retry', 'symbol': 'R'},
+  'Pause:        ': {'id': 'pause', 'symbol': 'Esc'},
 }
+
+var newControlsOptions = {
+  'Move Left One: ': {'id': 'moveLeft', 'symbol': 'W'},
+  'Move Right One:': {'id': 'moveRight', 'symbol': 'E'},
+  'Left DAS:      ': {'id': 'leftDAS', 'symbol': 'Q'},
+  'Right DAS:     ': {'id': 'rightDAS', 'symbol': 'R'},
+  'Context shift: ': {'id': 'contextShift', 'symbol': 'Space'},
+  'Hold:          ': {'id': 'holdPiece', 'symbol': 'M'},
+  'Rotate Right:  ': {'id': 'rotRight', 'symbol': 'O'},
+  'Rotate Left:   ': {'id': 'rotLeft', 'symbol': 'U'},
+  'Rotate 180:    ': {'id': 'rot180', 'symbol': 'I'},
+  'Rotate 0:      ': {'id': 'hardDrop', 'symbol': 'P'},
+  'Retry:         ': {'id': 'retry', 'symbol': 'T'},
+  'Pause:         ': {'id': 'pause', 'symbol': 'Esc'},
+}
+
+// var currentControlsOptions = settings['New Controls'] ? newControlsOptions : defaultControlsOptions;
+
+function drawControlsMenu() {
+  var currentControlsOptions = settings['New Controls'] ? newControlsOptions : defaultControlsOptions;
+
+  controls.innerHTML = '';
+  for (var i = 0, len = Object.keys(currentControlsOptions).length; i < len; i++) {
+    var currentControl = Object.keys(currentControlsOptions)[i];
+    var currentId = currentControlsOptions[currentControl].id;
+    var currentSymbol = currentControlsOptions[currentControl].symbol;
+
+    var tr = document.createElement('tr');
+    var th = document.createElement('th');
+    var td = document.createElement('td');
+    td.id = currentId;
+
+    th.innerHTML = currentControl;
+    tr.appendChild(th);
+    td.innerHTML = currentSymbol;
+    tr.appendChild(td);
+    controls.appendChild(tr);
+  }
+
+  controlCells = controls.getElementsByTagName('td');
+
+  for (var i = 0, len = controlCells.length; i < len; i++) {
+    controlCells[i].onclick = function() {
+      // First check if we're already waiting for an input.
+      if (currCell) {
+        // TODO DRY
+        // Make this into a function and call it when we press Esc.
+        binds[currCell.id] = tempKey;
+        currCell.innerHTML = key[tempKey];
+      }
+      tempKey = binds[this.id];
+      this.innerHTML = 'Press key';
+      currCell = this;
+    };
+  }
+}
+
+// Draw controls menu initially
+drawControlsMenu();
+
+
+/**
+ * Show and hide menus.
+ */
+var menus = document.getElementsByClassName('menu');
+function menu(menuIndex) {
+  // Redraw the controls menu when a menu is opened just in case.
+  // This is a bit of a hack but it works.
+  drawControlsMenu();
+
+  for (var i = 0, len = menus.length; i < len; i++) {
+    menus[i].classList.remove('on');
+  }
+  if (menuIndex !== void 0) menus[menuIndex].classList.add('on');
+}
+
+
 // Listen for key input if a control has been clicked on.
 addEventListener(
   'keyup',
@@ -175,6 +240,7 @@ function settingsLoop() {
   }
   setLoop = setTimeout(settingsLoop, 50);
 }
+
 var s;
 var settingsArrow;
 // TODO DRY this.
@@ -219,8 +285,8 @@ function loadLocalData() {
   }
   // TODO When new version just update with new stuff, rest stays unchanged.
   if (localStorage['version'] !== version) {
-    localStorage.removeItem('settings');
-    localStorage.removeItem('binds');
+    // localStorage.removeItem('settings'); // TODO: Commented out for debugging
+    // localStorage.removeItem('binds'); // TODO: Commented out for debugging
   }
   if (localStorage['settings']) {
     settings = JSON.parse(localStorage.getItem('settings'));
